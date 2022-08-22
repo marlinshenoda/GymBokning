@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using GymBokning.Data;
 using GymBokning.Models.Entity;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+using GymBokning.Models.ModelView;
 
 namespace GymBokning.Controllers
 {
@@ -27,6 +29,32 @@ namespace GymBokning.Controllers
                           View(await _context.GymClasses.ToListAsync()) :
                           Problem("Entity set 'ApplicationDbContext.GymClasses'  is null.");
         }
+        public async Task<IActionResult> BookedGymClassAllList()
+        {
+            var model = await GetModel();
+
+            //all gymclasses regardless of StartTime
+            return View("BookedGymClassAllListView", model);
+        }
+        public ActionResult HistoryToAllGymClasses() => RedirectToAction("BookedGymClassAllList");
+
+        public async Task<IEnumerable<BookedGymClassViewModel>> GetModel()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var model = await _context.GymClasses.Select(i => new BookedGymClassViewModel
+            {
+                Id = i.Id,
+                Name = i.Name,
+                StartTime = i.StartTime,
+                Duration = i.Duration,
+                Description = i.Description,
+                ApplicationUserGymClassIsBooked = i.AttendingMembers.Any(a => a.ApplicationUserId == userId)
+            }).ToListAsync();
+
+            var modelOrdered = model.OrderByDescending(m => m.StartTime);
+            return modelOrdered;
+        }
+        public ActionResult HistoryToNewGymClasses() => RedirectToAction("BookedGymClass");
 
         // GET: GymClasses/Details/5
         public async Task<IActionResult> Details(int? id)
