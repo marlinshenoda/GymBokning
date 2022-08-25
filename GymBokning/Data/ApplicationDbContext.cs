@@ -20,6 +20,7 @@ namespace GymBokning.Data
           //  builder.Entity<GymClass>().HasQueryFilter(g => g.StartTime > DateTime.Now);
         }
         public DbSet<GymClass> GymClasses { get; set; }
+        public DbSet<ApplicationUserGymClass> ApplicationUserGymClass { get; set; }
 
     }
 }

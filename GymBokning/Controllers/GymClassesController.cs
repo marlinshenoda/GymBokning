@@ -10,24 +10,28 @@ using GymBokning.Models.Entity;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using GymBokning.Models.ModelView;
+using Microsoft.AspNetCore.Identity;
 
 namespace GymBokning.Controllers
 {
     public class GymClassesController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly UserManager<ApplicationUser> userManager;
 
-        public GymClassesController(ApplicationDbContext context)
+        public GymClassesController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
         {
             _context = context;
+            this.userManager = userManager;
+
         }
 
         // GET: GymClasses
         public async Task<IActionResult> Index()
         {
-              return _context.GymClasses != null ? 
-                          View(await _context.GymClasses.ToListAsync()) :
-                          Problem("Entity set 'ApplicationDbContext.GymClasses'  is null.");
+            return _context.GymClasses != null ?
+                        View(await _context.GymClasses.ToListAsync()) :
+                        Problem("Entity set 'ApplicationDbContext.GymClasses'  is null.");
         }
         public async Task<IActionResult> BookedGymClassAllList()
         {
@@ -185,34 +189,52 @@ namespace GymBokning.Controllers
             {
                 _context.GymClasses.Remove(gymClass);
             }
-            
+
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
 
         private bool GymClassExists(int id)
         {
-          return (_context.GymClasses?.Any(e => e.Id == id)).GetValueOrDefault();
+            return (_context.GymClasses?.Any(e => e.Id == id)).GetValueOrDefault();
         }
 
+ 
         [Authorize]
 
-        public async Task<IActionResult> BookingToogle(int? id)
+        public async Task<IActionResult> BookingToggle(int? id)
         {
-            if (id == null)
-                return NotFound();
-            //User.HasClaim;
+            if (id == null) return NotFound();
 
-            var gymClass = await _context.GymClasses.FindAsync(id);
-            if (gymClass == null)
+            else
             {
-                return NotFound();
+                //this user is logged in             
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                //which class?
+                var gymClass = await _context.GymClasses.FirstOrDefaultAsync(g => g.Id == id);
+
+                //logged user is on this class 
+                var b = await _context.ApplicationUserGymClass.FirstOrDefaultAsync(t => t.ApplicationUserId == userId && t.GymClassId == id);
+
+                //user is not on this class: add user to this class (add into ApplicationUserGymClass db)
+                if (b == null)
+                {
+                    var classAndMember = new ApplicationUserGymClass
+                    {
+                        ApplicationUser = _context.Users.ToList().FirstOrDefault(u => u.Id == userId),
+                        GymClass = gymClass,
+                    };
+                    _context.ApplicationUserGymClass.Add(classAndMember);
+                }
+                else
+                {
+                    _context.ApplicationUserGymClass.Remove(b);
+                }
+                await _context.SaveChangesAsync();
+
+                return RedirectToAction("Index", new { id = gymClass.Id });
             }
-
-            var gymClass2 = await _context.GymClasses.Where(e => e.Id == id /*&& User.Identity.Name == e.Name*/).FirstOrDefaultAsync();
-
-            return RedirectToAction(nameof(Index), id);
-
         }
     }
 }
